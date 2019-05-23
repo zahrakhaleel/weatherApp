@@ -1,21 +1,177 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import {   StyleSheet,
+  View,
+  ImageBackground,
+  Text,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  StatusBar, } from 'react-native';
+import { Constants, Location, Permissions } from 'expo'
+import { fetchOpenWeatherCity, fetchOpenWeatherGPS } from './utils/api';
+import getImageForWeather from './utils/getImageForWeather';            
+import SearchInput from './components/SearchInput';                                                                                                                                      ;
+
 
 export default class App extends React.Component {
+  state = {
+    isLoadingComplete: false,
+    error: false,
+    location: '',
+    temperature: 0,
+    weather: '',
+    windy:'',
+    humid:''
+  };
+
+  componentDidMount() {
+    this.handleGetLocation();
+  }
+                                                                             
+  handleGetLocation = async () => {
+    const {status} = await Permissions.askAsync(Permissions.LOCATION);
+    if (status !== "granted") {
+      this.setState({error: true});
+    }
+    const {coords} = await Location.getCurrentPositionAsync({});
+    this.handleUpdateGPS(coords);
+  }
+
+  handleUpdateLocation = async city => {
+    if (!city) return;
+
+    this.setState({ loading: true }, async () => {
+      try {
+        const { location, weather, temperature,windy, humid } = await fetchOpenWeatherCity(city);
+        this.setState({
+          loading: false,
+          error: false,
+          location,
+          weather,
+          temperature,
+          windy,
+          humid
+        });
+      } catch (e) {
+        this.setState({
+          loading: false,
+          error: true,
+        });
+      }
+    });
+  };
+
+  
+  handleUpdateGPS = async coords => {
+    if (!coords) return;
+    this.setState({ loading: true }, async () => {
+      try {
+        const { location, weather, temperature, windy,humid} = await fetchOpenWeatherGPS(coords);
+        
+        this.setState({
+          loading: false,
+          error: false,
+          location,
+          weather,
+          temperature,
+          windy,
+          humid
+        });
+      } catch (e) {
+        this.setState({
+          loading: false,
+          error: true,
+        });
+      }
+    });
+  }; 
+
   render() {
+    const { loading, error, location, weather, temperature, windy,humid } = this.state;
+
+
     return (
-      <View style={styles.container}>
-        <Text>Open up App.js to start working on your app!</Text>
-      </View>
+      <KeyboardAvoidingView style={styles.container} behavior="padding">
+        <StatusBar barStyle="light-content" />
+        <ImageBackground
+          source={getImageForWeather(weather)}
+          style={styles.imageContainer}
+          imageStyle={styles.image}>
+
+
+          <View style={styles.detailsContainer}>
+            <ActivityIndicator animating={loading} color="white" size="large" />
+
+            {!loading && (
+              <View>
+                {error && (
+                  <Text style={[styles.smallText, styles.textStyle]}>
+                    please Enter City here
+                  </Text>
+                )}
+
+                {!error && (
+                  <View>
+                    <Text style={[styles.largeText, styles.textStyle]}>
+                      {location}
+                    </Text>
+                    <Text style={[styles.smallText, styles.textStyle]}>
+                      Weather condition: {weather}
+                    </Text>
+                    <Text style={[styles.smallText, styles.textStyle]}>
+                      Wind speed: {windy} kph
+                    </Text>
+                    <Text style={[styles.smallText, styles.textStyle]}>
+                    humidity: {humid}
+                    </Text>
+                    <Text style={[styles.largeText, styles.textStyle]}>
+                      {`${Math.round(temperature)}°`}
+                    </Text>
+
+                  </View>
+                )}
+
+                <SearchInput
+                  placeholder="Search any city"
+                  onSubmit={this.handleUpdateLocation}
+                />
+              </View>
+            )}
+          </View>
+        </ImageBackground>
+      </KeyboardAvoidingView>
     );
   }
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
+    backgroundColor: '#34495E',
+  },
+  imageContainer: {
+    flex: 1,
+  },
+  image: {
+    flex: 1,
+    width: null,
+    height: null,
+    resizeMode: 'cover',
+  },
+  detailsContainer: {
+    flex: 1,
     justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    paddingHorizontal: 20,
+  },
+  textStyle: {
+    textAlign: 'center',
+    fontFamily: Platform.OS === 'ios' ? 'AvenirNext-Regular' : 'Roboto',
+    color: 'white',
+  },
+  largeText: {
+    fontSize: 44,
+  },
+  smallText: {
+    fontSize: 18,
   },
 });
